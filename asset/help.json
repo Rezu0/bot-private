@@ -1,0 +1,22 @@
+[
+    {
+        "id": 1,
+        "title": "Command andalan kita **/ask**",
+        "desc": "Command ini mempunyai kelebihan untuk tanya pada AI atau biasa di kenal dengan orang orang adalah ChatGPT. Command ini benar benar powerful tapi tidak se-powerul itu, apa aja si yang bisa di lakukan oleh Command ini? Hmmm... Tentu saja bisa mengerjakan tugas sekolah dan kuliah kalian! Lebih tepatnya pengetahuan umum bot ini sangat luas! bukan cuma itu saja kalian juga bisa membuat program/coding dari bot ini juga loh (yang penting tau promptnya saja😍)"
+    },
+    {
+        "id": 2,
+        "title": "Command yang semua bot ada! **/avatar**",
+        "desc": "Hmm... seperti pada di bot bot lainnya dan sudah tau dari nama command nya, yak benar command ini untuk mengecek Avatar para User"
+    },
+    {
+        "id": 3,
+        "title": "Command khusus para admin di luar sana! **/kick**",
+        "desc": "Tentu saja command ini hanya bisa di pake oleh para admin saja! Kenapa cuma kick? tentu saja biar lebih mantap dong hilang sekalian!"
+    },
+    {
+        "id": 4,
+        "title": "Command NSFW kita nih hahaha! **/nhentai**",
+        "desc": "Command ini akan segera rilis! Tunggu ya!"
+    }
+]

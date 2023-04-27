@@ -1,300 +1,284 @@
-const { default: axios, Axios } = require('axios');
-// const { LocalStorage } = require('node-localstorage');
-const { Client, GatewayIntentBits, REST } = require('discord.js');
-const fetch = (...args) =>
-import('node-fetch').then(({ default: fetch }) => fetch(...args));
-const Tesseract = require('tesseract.js')
-// const vision = require('@google-cloud/vision');
-// const clientGoogle = new vision.ImageAnnotatorClient({
-//     keyFilename: 'vision-api-382004-fb0551d1161d.json'
-// })
-require('dotenv/config')
+const { Client, Collection, Events, GatewayIntentBits, REST, time, EmbedBuilder, Embed, ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js')
+const date = require('date-and-time')
+const fs = require('node:fs')
+const path = require('node:path')
+const { token } = require('./config.json');
+const { default: axios } = require('axios');
+const user = require('./commands/user');
+const paginationEmbed = require('discordjs-button-pagination')
 require('axios')
-
-// ** untuk connect ke google vision
-// clientGoogle.labelDetection('https://cdn.discordapp.com/attachments/1087307643128909884/1090087672611090462/image.png')
-//     .then(results => {
-//         const labels = results[0].labelAnnotations
-//         labels.forEach((labels) => console.log(labels.description))
-//     }).catch(err => {
-//         console.error('ERROR: ', err);
-//     })
-
-// const img = "https://tesseract.projectnaptha.com/img/eng_bw.png"
-
-// Tesseract.recognize(
-//     'https://cdn.discordapp.com/attachments/1087307643128909884/1090087672611090462/image.png',
-//     'KOR',
-//     { logger: m => console.log(m) }
-// ).then(({ data: { text } }) => {
-//     console.log(text);
-// })
-
-if(typeof localStorage === 'undefined' || localStorage === null){
-    var LocalStorage = require('node-localstorage').LocalStorage;
-    localStorage = new LocalStorage('./scratch')
-}
+require('dotenv/config')
+let tyoData = fs.readFileSync('./asset/textForTyo.json')
+let tyos = JSON.parse(tyoData)
+// console.log(t.pages[0].blocks[1].paragraphs[0].words[1].symbols);
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildPresences
     ],
 })
 
-function removeDataLocal(message){
-    localStorage.removeItem('finalStorage')
-    localStorage.removeItem('finalUrl')
-    localStorage.removeItem('finalTitle')
-    localStorage.removeItem('allDataID')
+client.commands = new Collection();
 
-    message.channel.send('Local data remove...')
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-    setTimeout(() => {
-        message.delete()
-    }, 1000);
+for (const file of commandFiles) {
+	const filePath = path.join(commandsPath, file);
+	const command = require(filePath);
+	// Set a new item in the Collection with the key as the command name and the value as the exported module
+	if ('data' in command && 'execute' in command) {
+		client.commands.set(command.data.name, command);
+	} else {
+		console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+	}
 }
 
-function saveDataTemp(message){
-    var arrID = [],
-        arrURL = [],
-        arrTitle = []
-    const config = {
-        method: 'get',
-        url: process.env.LINK_API,
-        headers: { }
-    }
-    
-    axios(config)
-        .then(function(res){
-            res.data.items.forEach(item => {
-                arrID.push(item.id)
-                arrURL.push(item.url)
-                arrTitle.push(item.title)
-            });
-            
-            if(arrID.toString() == localStorage.getItem('finalStorage')){
-                message.channel.send('Tidak ada Update!')
-            }else{
-                localStorage.setItem('finalUrl', arrURL.toString())
-                localStorage.setItem('finalTitle', arrTitle.toString())
-                localStorage.setItem('finalStorage', arrID.toString())
-                message.channel.send('Data sudah di Update!')
-            }
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
 
-        })
-}
+	const command = interaction.client.commands.get(interaction.commandName);
 
-function fetchApiJavDesu(message){
-    var data = []
-    var splitURL = localStorage.getItem('finalUrl').split(',')
-    var splitTitle = localStorage.getItem('finalTitle').split(',')
-    
-    for (let i = 0; i < splitURL.length; i++) {
-        data[i] = {
-            'URL': splitURL[i],
-            'Title': splitTitle[i]
-        }
-    }
+	if (!command) {
+		console.error(`No command matching ${interaction.commandName} was found.`);
+		return;
+	}
 
-    data.reverse()
-    data.forEach(el => {
-        message.channel.send(el.Title + '\n' + el.URL)
-    });
-}
+	try {
+		await command.execute(interaction);
+	} catch (error) {
+		console.error(error);
+		if (interaction.replied || interaction.deferred) {
+			await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+		} else {
+			await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+		}
+	}
+});
 
-function restartBot(message){
-    const id = [
-        { name: 'Rezu', id: '383088246877585408' },
-        { name: 'Ferdi', id: '586181794467151892' }
-    ]
+client.on('ready', (state) => {
+    console.log(`login in as ${client.user.tag}`);
+    client.user.setStatus('online')
+    client.user.setActivity('Using /ask for to bot', {
+        url: 'https://discord.com/api/oauth2/authorize?client_id=1080667316284575764&permissions=8&scope=bot%20applications.commands'
+    })
+})
 
-    id.forEach(el => {
-        if (message.author == el.id) {
-            message.channel.send('Restarting...').then(msg => {
-                message.delete()
-                client.destroy()
-                setTimeout(() => {
-                    client.login(process.env.TOKEN)
-                    message.channel.send('Bot ready to go!')
-                }, 1500);
-            })
-        }
-    });
-}
-
-function embedHelp(message){
-    const color = 15300753
-    const embed = {
-        color: color,
-        title: 'Prefix This Bot!',
-        author: {
-            name: message.author.tag,
-            icon_url: message.author.displayAvatarURL
-        },
-        description: "**1. !desu ( For Update Jav-desu )\n2. !desu ping ( Ping This Bot! )\n3. !desu prefix ( Show all prefix this bot! )\n4. !desu restart ( Restart server bot! )\n5. !desu check ( Check if data updated or not )\n6. !desu remove ( Remove data local )**",
-    }
-    message.channel.send({ embeds: [embed] })
-}
-
-function middlewareAdmin(id){
-    switch (true) {
-        case (id == '383088246877585408'):
-            return true
-            break;
-        case (id == '586181794467151892'):
-            return true
-            break;
-        case (id == '1052631570302910595'):
-            return true
-            break;
-        default:
-            return false
-            break;
-    }
-}
-
-function saveDataIgo(message){
-    var finalData;
-    var tempDataOne = [],
-        tempDataTwo = [],
-        tempID = [],
-        dataUrl = [],
-        dataTitle = [],
-        dataSementara = '',
-        dataTitleSementara = '',
-        finalTemp = ''
-
-    var configOne = {
-        method: 'get',
+const configApiModel = (url, method, message) => {
+    var config = {
+        method: method,
         maxBodyLength: Infinity,
-        url: process.env.LINK_API_IGO_ONE
+        url: url,
+        headers: {
+            'Content-Type': process.env.AI_CONTENT_TYPE,
+            'organization': process.env.AI_ORGANIZATION,
+            'Authorization': 'Bearer ' + process.env.AI_BEARERTOKEN
+        },
     }
 
-    axios(configOne).then(function(res){
-        res.data.items.forEach(el => {
-            tempDataOne.push(el)
-        })
+    axios(config).then(function(res){
+        res.data.data.forEach(element => {
+            message.author.send('``` Model ID: ' + element.id + '\nOwned By: ' + element.owned_by + '```').catch(console.error)
 
-        var configTwo = {
-            method: 'get',
-            maxBodyLength: Infinity,
-            url: process.env.LINK_API_IGO_TWO
-        }
+        });
 
-        // kedua
-        axios(configTwo).then(function(res){
-            res.data.items.forEach(el => {
-                tempDataTwo.push(el)
-            })
-
-            finalData = [...tempDataTwo, ...tempDataOne]
-
-            finalData.reverse()
-            finalData.forEach(el => {
-                tempID.push(el.id)
-                dataUrl.push(el.url)
-                dataTitle.push(el.title)
-            })
-
-            dataSementara = finalData[0].id
-            dataTitleSementara = finalData[0].title
-
-            finalTemp = localStorage.getItem('lastOne')
-            localStorage.setItem('finalTemp', finalTemp)
-
-            if(tempID.toString() == localStorage.getItem('allDataID')){
-                message.reply(`Tidak ada update! \n **Last data**: ${dataTitleSementara}`)
-            }else{
-                localStorage.setItem('allDataID', tempID.toString())
-                localStorage.setItem('lastOne', dataSementara)
-                localStorage.setItem('dataUrl', dataUrl)
-                localStorage.setItem('dataTitle', dataTitle)
-
-                message.reply(`Data sudah di Update! \n **Last data**: ${dataTitleSementara}`)
-            }
-        }).catch(function(err){
-            if(err.response){
-                message.reply(`data 2 ${err.response.statusText} (${err.response.status})`)
-            }
-        }) 
-
-    }).catch(function(err){
-        if(err.response){
-            message.reply(`data 1 ${err.response.statusText} (${err.response.status})`)
-        }
+        message.channel.send('Silahkan cek DM kamu!')
+    }).catch(function(error){
+        console.log(error);
     })
 }
 
-function fetchApiIgoDesu(message){
-    var split = localStorage.getItem('allDataID').split(',')
-    var checkingWhere = split.indexOf(localStorage.getItem('finalTemp'))
-    var splitUrl = localStorage.getItem('dataUrl').split(',')
-    var splitTitle = localStorage.getItem('dataTitle').split(',')
-    var kosong = []
+client.on('messageCreate', async (message) => {
+    const prefixGlobal = message.content.substring(0, 3)
 
-    if (checkingWhere == 0) {
-        for (let i = 0; i < splitUrl.length; i++) {
-            kosong[i] = {
-                'url': splitUrl[i],
-                'title': splitTitle[i]
-            }
-        }
+    if(message.content == '<@1080667316284575764>'){
+        message.channel.send('Pesan Rahasia berhasil di kirim!')
+        console.log(tyos[Math.floor(Math.random() * tyos.length)].text);
 
-        kosong.forEach(el => {
-            message.channel.send(`${el.title} \n${el.url}`)
-        });
-    }else{
-        for (let i = 0; i < checkingWhere; i++) {
-            kosong[i] = {
-                'url': splitUrl[i],
-                'title': splitTitle[i]
-            }
-        }
-
-        kosong.forEach(el => {
-            message.channel.send(`${el.title} \n${el.url}`)
-        })
+        setTimeout(() => {
+            // DM ke tyo
+            client.users.fetch('433113095355760641', false).then((user) => {
+                user.send(tyos[Math.floor(Math.random() * tyos.length)].text)
+            })
+            
+            // Kirim pesan ke rapat petinggi dan tag tyo
+            client.channels.cache.get('694156139994284072').send(`Halo <@433113095355760641> Silahkan cek DM kamu ya bang ganteng...`)
+        }, 1500);
     }
-}
 
-client.on('ready', () => {
-    console.log('The bot is ready');
-})
+    if(prefixGlobal == '!ai'){
+        if(message.content == prefixGlobal + " ping"){
+            message.channel.send('Pong for ' + message.author.username + ' at ' + time())
+        }else if(message.content.substring(0, 7) == '!ai msg'){
+            const questionForAI = message.content.split(prefixGlobal + ' msg')
+            var data = JSON.stringify({
+                "model": "gpt-3.5-turbo-0301",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": questionForAI[1]
+                    }
+                ]
+            })
+    
+            var config = {
+                method: 'post',
+                maxBodyLength: Infinity,
+                url: process.env.AI_URL,
+                headers: {
+                    'Content-Type': process.env.AI_CONTENT_TYPE,
+                    'organization': process.env.AI_ORGANIZATION,
+                    'Authorization': 'Bearer ' + process.env.AI_BEARERTOKEN
+                },
+                data: data
+            }
+    
+            axios(config).then(function(res){
+                if(res.data.choices[0].message.content.length >= 2000){
+                    message.reply('response melebihi batas maksimum')
+                }else{
+                    console.log(res.data.choices[0].message);
+                    message.reply(res.data.choices[0].message.content + '\n\n\n**lebih di sarankan pakai /ask :prompt lalu cari nama bot ini...**')
 
-client.on('messageCreate', message => {
-    if(message.content === '!desu'){
-        if(middlewareAdmin(message.author.id)){
-            fetchApiJavDesu(message)
-        }else{
-            message.channel.send('Anda bukan admin')
+                    const embed = new EmbedBuilder()
+                        .setColor('White')
+                        .setTitle(`Question from Server: ${message.guild.name}`)
+                        .setDescription(`Pada jam: ${time()}\nQuestion: **${questionForAI[1]}**\nFrom: **${message.author.tag}**`)
+
+                    client.channels.cache.get('1085369770066587711').send({
+                        embeds: [embed]
+                    })
+                }
+            }).catch(function(error){
+                console.log(error);
+            })
+    
+            // private dm
+            message.author.send('Di Jam dan Hari: ' + time() + '\nKamu tanya tentang: **' + questionForAI[1] + '**').catch(console.error)
+        }else if(message.content == prefixGlobal + " model"){
+            configApiModel(process.env.AI_URL_MODELS, 'get', message)
+        }else if(message.content == prefixGlobal + ' server'){
+            // return message.channel.send('Total List Server: ' + client.guilds.cache.size);
+            var objectServer = []
+            const embedPageOne = new EmbedBuilder()
+                .setColor('Random')
+                .setTitle(`List server : ${client.guilds.cache.size}`)  
+                .setAuthor({
+                    name: message.author.username,
+                    iconURL: message.author.avatarURL(),
+                    url: 'https://discord.com/api/oauth2/authorize?client_id=1080667316284575764&permissions=8&scope=bot%20applications.commands'
+                })
+                .setTimestamp()
+                .setFooter({
+                    text: `Total server: ${client.guilds.cache.size}`
+                })
+            
+            const embedPageTwo = new EmbedBuilder()
+                .setColor('Random')
+                .setTitle(`List server: ${client.guilds.cache.size}`)
+                .setAuthor({
+                    name: message.author.username,
+                    iconURL: message.author.avatarURL(),
+                    url: 'https://discord.com/api/oauth2/authorize?client_id=1080667316284575764&permissions=8&scope=bot%20applications.commands'
+                })
+                .setFooter({
+                    text: `Total server: ${client.guilds.cache.size}`
+                })
+
+            const buttonPrev = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('prev')
+                        .setLabel('Prev')
+                        .setStyle(ButtonStyle.Secondary),
+                )
+            
+            const buttonNext = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                        .setCustomId('next')
+                        .setLabel('Next')
+                        .setStyle(ButtonStyle.Primary)
+                    )
+
+            if (!client.guilds.cache.size <= 25) {
+                client.guilds.cache.map(guild => {
+                    objectServer.push({
+                        id: guild.id,
+                        name: guild.name,
+                        allMember: guild.memberCount,
+                        memberCount: guild.members.cache.filter(member => !member.user.bot).size,
+                        bot: guild.members.cache.filter(member => member.user.bot).size,
+                        joinedTimestamp: guild.joinedTimestamp
+                    })
+                })
+            }
+
+            const maxDiscord = 25
+            const sisaCount = objectServer.length - maxDiscord
+            // looping pertama
+            objectServer.forEach((guild, index) => {
+                if (index < maxDiscord) {
+                    embedPageOne.addFields(
+                        {
+                            name: guild.name,
+                            value: '```ID server: ' + guild.id + ' \nTotal Member: ' + guild.memberCount + ' \nTotal Bot: ' + guild.bot + ' \nCount member: ' + guild.allMember + '``` Join At: ' + time(guild.joinedTimestamp),
+                            inline: true
+                        }
+                    )
+                }
+            })
+
+            // looping kedua
+            objectServer.slice(maxDiscord, objectServer.length).forEach((guild, index) => {
+                embedPageTwo.addFields(
+                    {
+                        name: guild.name,
+                        value: '```ID server: ' + guild.id + ' \nTotal Member: ' + guild.memberCount + ' \nTotal Bot: ' + guild.bot + ' \nCount member: ' + guild.allMember + '``` Join At: ' + time(guild.joinedTimestamp),
+                        inline: true
+                    }
+                )
+            })
+
+            message.channel.send({
+                embeds: [embedPageOne],
+                components: [buttonNext]
+            })
+
+            const collector = message.channel.createMessageComponentCollector()
+
+            collector.on('collect', async i => {
+                if (i.customId == 'next') {
+                    await i.update(
+                        {
+                            embeds: [embedPageTwo],
+                            components: [buttonPrev]
+                        }
+                    ).catch(async err => {
+                        await interaction.reply({
+                            content: 'Maaf coba lagi...',
+                            ephemeral: true
+                        })
+                    })
+                }else{
+                    await i.update(
+                        {
+                            embeds: [embedPageOne],
+                            components: [buttonNext]
+                        }
+                    ).catch(async err => {
+                        await interaction.reply({
+                            content: 'Maaf coba lagi...',
+                            ephemeral: true
+                        })
+                    })
+                }
+            })
         }
-    }else if(message.content === '!desu ping'){
-        message.reply('pong ' + message)
-        console.log(message.author);
-
-        var firstLetter = message.content.split(' ', 1) == '!'
-    }else if (message.content === '!desu restart') {
-        restartBot(message)
-    }else if(message.content === '!desu prefix'){
-        embedHelp(message)
-        // message.channel.send(embed)
-    }else if(message.content === '!desu check'){
-        if(middlewareAdmin(message.author.id)){
-            saveDataTemp(message)
-        }else{
-            message.channel.send('Anda bukan admin')
-        }
-        // saveDataTemp(message)
-    }else if(message.content === '!desu remove'){
-        removeDataLocal(message)
-    }else if(message.content === '!desu test'){
-        console.log(middlewareAdmin(message.author.id))
-    }else if(message.content === '!igo check'){
-        saveDataIgo(message)
-    }else if(message.content === '!igo'){
-        fetchApiIgoDesu(message)
     }
 })
 
